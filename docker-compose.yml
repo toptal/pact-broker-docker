@@ -16,6 +16,7 @@ services:
     image: pactfoundation/pact-broker:2.102.2.0
     ports:
       - "9292:9292"
+      - "9293:9293" # puma-metrics port
     depends_on:
       - postgres
     environment:
