@@ -102,10 +102,15 @@ GEM
     padrino-support (0.15.3)
     parslet (2.0.0)
     pg (1.5.8)
+    prometheus-client (4.2.3)
+      base64
     psych (5.1.2)
       stringio
     puma (5.6.9)
       nio4r (~> 2.0)
+    puma-metrics (1.2.5)
+      prometheus-client (>= 0.10)
+      puma (>= 5.0)
     racc (1.8.1)
     rack (2.2.9)
     rack-protection (3.2.0)
@@ -169,6 +174,7 @@ DEPENDENCIES
   pact_broker
   pg (~> 1.5)
   puma (~> 5.6)
+  puma-metrics
   rake (~> 13.0)
   sqlite3 (~> 1.6)
 
