@@ -1,11 +1,26 @@
-FROM ruby:2.7.6-alpine3.15
+FROM ruby:3.3.5-alpine3.20 as base
 
-ARG SUPERCRONIC_PLATFORM=amd64
-ARG SUPERCRONIC_SHA1SUM=a2e2d47078a8dafc5949491e5ea7267cc721d67c
+# 1. Install target specfic dependencies
+# - gcompat required for arm/arm64 (otherwise nokogiri breaks when viewing network graph)
+#   - https://github.com/sparklemotion/nokogiri/issues/2414
+# 2. Supercronic - setup sha1sum for each supported architecture
+FROM base AS base-amd64
+ENV SUPERCRONIC_SHA1SUM=9f27ad28c5c57cd133325b2a66bba69ba2235799
+FROM base AS base-arm64
+ENV SUPERCRONIC_SHA1SUM=d5e02aa760b3d434bc7b991777aa89ef4a503e49
+RUN apk add --update --no-cache gcompat
+FROM base AS base-arm
+ENV SUPERCRONIC_SHA1SUM=9375e13dab716bab9f325de4a9145b482145f5e7
+RUN apk add --update --no-cache gcompat
 
-ENV SUPERCRONIC_URL=https://github.com/aptible/supercronic/releases/download/v0.1.11/supercronic-linux-${SUPERCRONIC_PLATFORM} \
-    SUPERCRONIC=supercronic-linux-${SUPERCRONIC_PLATFORM}
+# Supercronic - use base-$TARGETARCH to select correct base image SUPERCRONIC_SHA1SUM
+ARG TARGETARCH
+FROM base-$TARGETARCH AS pb-dev
 
+# Install Supercronic
+ARG TARGETARCH
+ENV SUPERCRONIC_URL=https://github.com/aptible/supercronic/releases/download/v0.2.30/supercronic-linux-${TARGETARCH} \
+    SUPERCRONIC=supercronic-linux-${TARGETARCH}
 RUN wget "$SUPERCRONIC_URL" \
  && echo "${SUPERCRONIC_SHA1SUM}  ${SUPERCRONIC}" | sha1sum -c - \
  && chmod +x "$SUPERCRONIC" \
@@ -25,21 +40,19 @@ WORKDIR $HOME
 COPY pact_broker/Gemfile pact_broker/Gemfile.lock $HOME/
 RUN cat Gemfile.lock | grep -A1 "BUNDLED WITH" | tail -n1 | awk '{print $1}' > BUNDLER_VERSION
 RUN set -ex && \
-  apk add --update --no-cache make gcc libc-dev mariadb-dev postgresql-dev sqlite-dev git && \
+  apk add --update --no-cache make gcc libc-dev mariadb-dev postgresql14-dev sqlite-dev git && \
   apk upgrade && \
   gem install bundler -v $(cat BUNDLER_VERSION) && \
-  ls /usr/local/lib/ruby/gems/2.7.0 && \
-  gem install rdoc -v "6.3.2" --install-dir /usr/local/lib/ruby/gems/2.7.0 && \
-  gem uninstall --install-dir /usr/local/lib/ruby/gems/2.7.0 -x rake && \
-  find /usr/local/lib/ruby -name webrick* -exec rm -rf {} + && \
-  find /usr/local/lib/ruby -name rdoc-6.1* -exec rm -rf {} + && \
   bundle config set deployment 'true' && \
   bundle config set no-cache 'true' && \
   bundle config set without 'development test' && \
   bundle install && \
   rm -rf vendor/bundle/ruby/*/cache .bundle/cache && \
-  find /usr/local/bundle/gems/ -name *.pem | grep -e sample -e test | xargs rm -rf {} + && \
-  find /usr/local/bundle/gems/ -name *.key | grep -e sample -e test | xargs rm -rf {} + && \
+  find $HOME/vendor/bundle /usr/local/lib/ruby/gems \
+      \( -name Gemfile.lock -o -name package-lock.json \) -exec rm -rf {} + && \
+  find $HOME/vendor/bundle /usr/local/lib/ruby/gems \
+      \( -name *.pem -o -name *.key -o -name *.java -o -name *.jar \)  | \
+      grep -e sample -e test -e spec | xargs rm -rf {} + && \
   apk del make gcc libc-dev git
 
 # Install source
@@ -48,6 +61,9 @@ RUN mv $HOME/clean.sh /usr/local/bin/clean
 
 RUN ln -s /pact_broker/script/db-migrate.sh /usr/local/bin/db-migrate
 RUN ln -s /pact_broker/script/db-version.sh /usr/local/bin/db-version
+
+# Hide pattern matching warnings
+ENV RUBYOPT="-W:no-experimental"
 
 # Start Puma
 ENV RACK_ENV=production

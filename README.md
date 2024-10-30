@@ -1,14 +1,25 @@
 # Dockerised Pact Broker
 
-[![Release Docker image](https://github.com/pact-foundation/pact-broker-docker/actions/workflows/release_image.yml/badge.svg)](https://github.com/pact-foundation/pact-broker-docker/actions/workflows/release_image.yml)
-
 This repository contains a Dockerized version of the [Pact Broker][pact-broker]. You can pull the `pactfoundation/pact-broker` image from [Dockerhub][pact-broker-docker]. If you're viewing these docs on Dockerhub, here is a link to the [github repository][github].
 
-> Note: On 12 May 2018, the format of the docker tag changed from `M.m.p-RELEASE` to `M.m.p.RELEASE` (where `M.m.p` is the semantic version of the underlying Pact Broker package) so that Dependabot can recognise when the version has been incremented.
+> Note: On 3 May 2023, the format of the docker tag changed from starting with the Pact Broker gem version (`2.107.0.1`), to ending with the Pact Broker gem version (`2.107.1-pactbroker2.107.1`). Read about the new versioning scheme [here](#versioning).
+
+[![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://GitHub.com/pact-foundation/pact-msw-adapter/graphs/commit-activity)
+
+[![Build and test](https://github.com/pact-foundation/pact-broker-docker/actions/workflows/test.yml/badge.svg)](https://github.com/pact-foundation/pact-broker-docker/actions/workflows/test.yml)
+[![Audit](https://github.com/pact-foundation/pact-broker-docker/actions/workflows/audit.yml/badge.svg)](https://github.com/pact-foundation/pact-broker-docker/actions/workflows/audit.yml)
+[![Release](https://github.com/pact-foundation/pact-broker-docker/actions/workflows/release_image.yml/badge.svg)](https://github.com/pact-foundation/pact-broker-docker/actions/workflows/release_image.yml)
+
+[![pulls](https://badgen.net/docker/pulls/pactfoundation/pact-broker?icon=docker&label=pulls)](https://hub.docker.com/r/pactfoundation/pact-broker)
+[![stars](https://badgen.net/docker/stars/pactfoundation/pact-broker?icon=docker&label=stars)](https://hub.docker.com/r/pactfoundation/pact-broker)
+
+[![size: amd64](https://badgen.net/docker/size/pactfoundation/pact-broker/latest-multi/amd64?icon=docker&label=size%3Aamd64)](https://hub.docker.com/r/pactfoundation/pact-broker)
+[![size: arm64](https://badgen.net/docker/size/pactfoundation/pact-broker/latest-multi/arm64?icon=docker&label=size%3Aarm64)](https://hub.docker.com/r/pactfoundation/pact-broker)
+[![size: arm](https://badgen.net/docker/size/pactfoundation/pact-broker/latest-multi/arm?icon=docker&label=size%3Aarm)](https://hub.docker.com/r/pactfoundation/pact-broker)
 
 ## In a hurry?
 
-If you want to try out a Pact Broker that can be accessed by all your teams, without having to fill in requisition forms and wait for 3 months, you can get a free trial at <a href="https://pactflow.io/?utm_source=github&utm_campaign=pact_foundation_pact_broker_docker">pactflow.io</a>. Built by a group of core Pact maintainers, Pactflow is a fork of the OSS Pact Broker with extra goodies like an improved UI, user and team management, secrets, field level verification results and federated login. It's also fully supported, and that means when something goes wrong, *someone else* gets woken up in the middle of the afternoon to fix it...
+If you want to try out a Pact Broker that can be accessed by all your teams, without having to fill in requisition forms and wait for 3 months, you can get a free trial at <a href="https://pactflow.io/?utm_source=github&utm_campaign=pact_foundation_pact_broker_docker">pactflow.io</a>. Built by a group of core Pact maintainers, PactFlow is a fork of the OSS Pact Broker with extra goodies like an improved UI, user and team management, secrets, field level verification results and federated login. It's also fully supported, and that means when something goes wrong, *someone else* gets woken up in the middle of the afternoon to fix it...
 
 ## Migrating from the dius/pact-broker image
 
@@ -16,11 +27,17 @@ The `pactfoundation/pact-broker` image is a forked version of the `dius/pact-bro
 
 All the environment variables used for `dius/pact-broker` are compatible with `pactfoundation/pact-broker`. The only breaking change is that the default port has changed from `80` to `9292` (because a user without root permisisons cannot bind to a port under 1024). If you wish to expose port 80 (or 443) you can deploy Ngnix in front of it (see the [docker-compose](https://github.com/pact-foundation/pact-broker-docker/blob/master/docker-compose.yml) file for an example).
 
-### Which one should I use?
+## Platforms
 
-Please read https://github.com/phusion/passenger/wiki/Puma-vs-Phusion-Passenger for information on which server will suit your needs best. The tl;dr is that if you want to run the docker image in a managed architecture which will make your application highly available (eg. ECS, Kubernetes) then use the `pactfoundation/pact-broker`. Puma will not restart itself if it crashes, so you will need external monitoring to ensure the Pact Broker stays available.
+Multi-platform images are available
 
-If you want to run the container as a standalone instance, then the `dius/pact-broker` image which uses Phusion Passenger may serve you better, as Passenger will restart any crashed processes.
+- `--platform=linux/amd64`
+- `--platform=linux/arm/v7`
+- `--platform=linux/arm64`
+
+  ```sh
+  docker run --rm -it --entrypoint /bin/sh pactfoundation/pact-broker:latest -c 'uname -sm'
+  ```
 
 ## Prerequisites
 
@@ -28,8 +45,8 @@ If you want to run the container as a standalone instance, then the `dius/pact-b
 
 ## Getting Started
 
-1. [Install Docker][docker] with Docker Engine 20.10.0 or later.
-2. Create a Postgres database.
+1. [Install Docker][docker] with Docker Engine 20.10.0 or later. **NOTE: Docker 19 is no longer supported by Docker, and the Pact Broker image will not run on it as the base image requires 20.10.0 or later.**
+2. Create a Postgres database (Postgres 9.6 or later).
 2. Setup the Pact Broker connection to the database using the environment variables described below.
 
 ### Create the database
@@ -44,21 +61,25 @@ GRANT ALL PRIVILEGES ON DATABASE pact_broker TO pact_broker;
 
 ### Configure the connection details
 
-You can either set the `PACT_BROKER_DATABASE_URL` in the format `driver://username:password@host:port/database` (eg. `postgres://user1:pass1@myhost/mydb`) or, you can set the credentials individually using the following environment variables:
+You can either set the `PACT_BROKER_DATABASE_URL` in the format `driver://username:password@host[:port]/database` (eg. `postgres://user1:pass1@myhost/mydb`) or, you can set the credentials individually using the following environment variables:
 
-    * `PACT_BROKER_DATABASE_ADAPTER` (optional, defaults to 'postgres', see note below.)
-    * `PACT_BROKER_DATABASE_USERNAME`
-    * `PACT_BROKER_DATABASE_PASSWORD`
-    * `PACT_BROKER_DATABASE_HOST`
-    * `PACT_BROKER_DATABASE_NAME`
-    * `PACT_BROKER_DATABASE_PORT` (optional, defaults to the default port for the specified adapter)
+* `PACT_BROKER_DATABASE_ADAPTER` (optional, defaults to 'postgres', see note below.)
+* `PACT_BROKER_DATABASE_USERNAME`
+* `PACT_BROKER_DATABASE_PASSWORD`
+* `PACT_BROKER_DATABASE_HOST`
+* `PACT_BROKER_DATABASE_NAME`
+* `PACT_BROKER_DATABASE_PORT` (optional, defaults to the default port for the specified adapter)
 
 Adapter can be 'postgres' (recommended) or 'sqlite' (non production use only).
 
 For investigations/spikes you can use SQlite. It is not supported as a production database, as it does not support concurrent requests. Additionally, unless you mount it from an external volume, the database will be disposed of when the container shuts down.
 
-  * `PACT_BROKER_DATABASE_ADAPTER` (set to `sqlite`)
-  * `PACT_BROKER_DATABASE_NAME` (arbitrary file in the `/tmp` directory eg. `/tmp/pact_broker.sqlite3`)
+* `PACT_BROKER_DATABASE_ADAPTER="sqlite"`
+* `PACT_BROKER_DATABASE_NAME="/tmp/pact_broker.sqlite3"` (arbitrary file a directory which is writeable by the application process, recommended to use `/tmp`)
+
+  OR
+
+* `PACT_BROKER_DATABASE_URL="sqlite:////tmp/pact_broker.sqlte3"`
 
 See the [database section](https://docs.pact.io/pact_broker/configuration/settings/#database) of the Pact Broker configuration docs for all the database configuration options available.
 
@@ -130,10 +151,10 @@ If you are running more than one Pact Broker Docker container at a time for the 
 You can see a working example in the [docker-compose-clean.yml](./docker-compose-clean.yml) file. To run the example locally, run:
 
 ```
-docker-compose -f docker-compose-clean.yml up pact-broker
+docker compose -f docker-compose-clean.yml up pact-broker
 
 # in another console
-docker-compose -f docker-compose-clean.yml up clean
+docker compose -f docker-compose-clean.yml up clean
 ```
 
 ### Known issues with the data clean up task
@@ -146,8 +167,8 @@ For a quick start with the Pact Broker and Postgres, we have an example
 [Docker Compose][docker-compose] setup you can use:
 
 1. Modify the `docker-compose.yml` file as required.
-2. Run `docker-compose build` to build the pact_broker container locally.
-3. Run `docker-compose up` to get a running Pact Broker and a clean Postgres database.
+2. Run `docker compose build` to build the pact_broker container locally.
+3. Run `docker compose up` to get a running Pact Broker and a clean Postgres database.
 
 Now you can access your local broker:
 
@@ -191,6 +212,29 @@ There is a community supported project that provides a [Pact Broker Helm Chart](
 If you are running the Docker image behind an ALB with an idle timeout, you may need to set the Puma persistent timeout using the `PACT_BROKER_PUMA_PERSISTENT_TIMEOUT` environment variable. See [issue 26](https://github.com/pact-foundation/pact-broker-docker/issues/26) for details.
 
 You will also want to make use of the [Heartbeat URL](#heartbeat-url)
+
+## Running on AWS serverless
+
+### Gitlab AWS CDK
+
+The following implementation is community provided & supported by [@learnautomatedtesting](https://github.com/learnautomatedtesting)
+
+Leverage GitLab & AWK CDK to publish and deploy a serverless framework of the Pact Broker and postgres database
+
+**Pre-Requisites**
+
+* AWS account with proper access
+* AWS CLI and AWS CDK installed
+* Docker installed for local container image management
+* Basic understanding of Docker, AWS ECS, and networking
+
+**Solution**
+
+* Amazon ECS with an ALB: Hosts both the Pact Broker and PostgreSQL in containers, with one click on your AWS environment (public ALB for demo purposes)
+  * https://gitlab.com/learnautomatedtesting/servicevirtualizationandpact/
+* API Examples Provider, two static results once deployed via AWS CDK with an expected verifier and wrong output
+  * https://gitlab.com/learnautomatedtesting/pactexample 
+
 
 ## Using different environment variable names
 
@@ -248,6 +292,28 @@ docker run --rm \
 * We use bundler audit on the underlying Pact Broker [codebase](https://github.com/pact-foundation/pact_broker/blob/master/.github/workflows/test.yml)
 * We use trivy in our [release workflow](https://github.com/pact-foundation/pact-broker-docker/blob/master/script/release-workflow/run.sh)
 * We also use [Snyk](https://app.snyk.io/org/pact-foundation-owm/projects) 
+
+# Versioning
+
+The Docker image tag uses a semantic-like versioning scheme (Docker tags don't support the `+` symbol, so we cannot implement a strict semantic version). The format of the tag is `M.m.p-pactbroker<pact_broker_version>` eg. `2.109.0-pactbroker2.107.1`. The `M.m.p` (eg. `2.109.0`) is the semantic part of the tag number, while the `-pactbroker<pact_broker_version>` suffix is purely informational.
+
+The major version will be bumped for:
+
+  * Major increments of the Pact Broker gem
+  * Major increments of the base image that contain backwards incompatible changes (eg. dropping support for Docker 19)
+  * Any other backwards incompatible changes made for any reason (eg. environment variable mappings, entrypoints, tasks, supported auth)
+
+The minor version will be bumped for:
+
+  * Minor increments of the Pact Broker gem
+  * Additional non-breaking functionality added to the Docker image
+
+The patch version will be bumped for:
+
+  * Patch increments of the Pact Broker gem
+  * Other fixes to the Docker image
+
+Until May 2023, the versioning scheme used the `M.m.p` from the Pact Broker gem, with an additional `RELEASE` number at the end (eg. `2.107.0.1`). This scheme was replace by the current scheme because it was unable to semantically convey changes made to the Docker image that were unrelated to a Pact Broker gem version change (eg. alpine upgrades).
 
 # Troubleshooting
 
