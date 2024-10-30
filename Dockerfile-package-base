@@ -1,11 +1,11 @@
-FROM ruby:2.6.8-alpine3.13
+FROM ruby:3.3.5-alpine3.20
 
 # Installation path
 ENV HOME=/app
 WORKDIR $HOME
 
-RUN apk add --update --no-cache git
-RUN gem install bundler -v 2.1.4
+RUN apk add --update --no-cache make gcc libc-dev mariadb-dev postgresql-dev sqlite-dev git
+RUN gem install bundler -v 2.4.22
 
 COPY Rakefile $HOME/
 COPY Gemfile Gemfile.lock $HOME/
